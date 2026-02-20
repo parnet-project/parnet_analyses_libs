@@ -100,10 +100,12 @@ class SequenceProfilesComparator:
         self,
         slice_config: SliceConfig,
         scoring_method: Literal["jensen_shannon_divergence", "abs_delta_p", "delta_p"],
+        aggregate_across_length_method: Literal["mean", "max", "min"] | None,
         aggregate_across_tasks_method: Literal["mean", "max", "min"] | None,
     ):
         self.slice_config = slice_config
         self.scoring_method = scoring_method
+        self.aggregate_across_length_method = aggregate_across_length_method
         self.aggregate_across_tasks_method = aggregate_across_tasks_method
 
     def _score(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -159,9 +161,9 @@ class SequenceProfilesComparator:
             tensor = torch.max(tensor, dim=-1, keepdim=True).values
         elif aggregate_method == "min":
             tensor = torch.min(tensor, dim=-1, keepdim=True).values
-
         else:
             raise ValueError(f"Unknown aggregation function: {aggregate_method}")
+        return tensor
 
     def __call__(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         assert x.shape == y.shape, (x.shape, y.shape)
@@ -169,5 +171,12 @@ class SequenceProfilesComparator:
         y = self._slice(y)
 
         scores = self._score(x=x, y=y)
+        if self.aggregate_across_length_method is not None:
+            # Here: verify that we still have a "length" dimension to aggregate over.
+            assert scores.ndim == 2, scores.shape  # (Tasks, Length)
+            scores = self._aggregate(
+                tensor=scores, aggregate_method=self.aggregate_across_length_method
+            )
+
         scores = self._aggregate(tensor=scores, aggregate_method=self.aggregate_across_tasks_method)
         return scores
