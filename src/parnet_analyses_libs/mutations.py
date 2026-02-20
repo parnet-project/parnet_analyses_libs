@@ -142,6 +142,7 @@ class SequenceProfilesComparator:
         self,
         tensor: torch.Tensor,
         aggregate_method: Literal["mean", "max", "min"] | None = None,
+        keep_dim: bool,
     ) -> torch.Tensor:
         #
         # NOTE: IN THIS SPECIFIC SITUATION (PARNET multi-task profile scoring)
@@ -156,11 +157,11 @@ class SequenceProfilesComparator:
             return tensor
 
         elif aggregate_method == "mean":
-            tensor = torch.mean(tensor, dim=-1, keepdim=True)
+            tensor = torch.mean(tensor, dim=-1, keepdim=keep_dim)
         elif aggregate_method == "max":
-            tensor = torch.max(tensor, dim=-1, keepdim=True).values
+            tensor = torch.max(tensor, dim=-1, keepdim=keep_dim).values
         elif aggregate_method == "min":
-            tensor = torch.min(tensor, dim=-1, keepdim=True).values
+            tensor = torch.min(tensor, dim=-1, keepdim=keep_dim).values
         else:
             raise ValueError(f"Unknown aggregation function: {aggregate_method}")
         return tensor
@@ -175,8 +176,14 @@ class SequenceProfilesComparator:
             # Here: verify that we still have a "length" dimension to aggregate over.
             assert scores.ndim == 2, scores.shape  # (Tasks, Length)
             scores = self._aggregate(
-                tensor=scores, aggregate_method=self.aggregate_across_length_method
+                tensor=scores,
+                aggregate_method=self.aggregate_across_length_method,
+                keep_dim=False,
             )
 
-        scores = self._aggregate(tensor=scores, aggregate_method=self.aggregate_across_tasks_method)
+        scores = self._aggregate(
+            tensor=scores,
+            aggregate_method=self.aggregate_across_tasks_method,
+            keep_dim=True,
+        )
         return scores
